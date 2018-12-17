@@ -38,12 +38,24 @@
 #define GP_TEST_TEST_FUNCTIONS_H
 
 #include <math.h>
+#include <cmath>
+#include <vector>
 
 namespace gp {
 namespace test {
 
   // A simple function (quadratic with lots of bumps) on the interval [0, 1].
   double BumpyParabola(double x, double freq = 5.0, double amp = 0.1);
+
+  // surface on [0,1]x[0,1]
+  double Surf(double x, double y);
+
+  double highDFunction(std::vector<double> v);
+
+  double P01(std::vector<double> v);
+  double P02(std::vector<double> v);
+  double P03(std::vector<double> v);
+  double P04(std::vector<double> v);
 
 } //\namespace test
 } //\namespace gp

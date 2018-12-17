@@ -13,7 +13,7 @@
 #include <random>
 #include <vector>
 #include <math.h>
-
+#include <iostream>
 
 #ifdef SYSTEM_OSX
 #include <GLUT/glut.h>
@@ -32,7 +32,7 @@ namespace test {
 
 // Check that we can approximate a simple 2D function.
 TEST(GaussianProcess, TestFunctionApprox2D) {
-  const size_t kNumTrainingPoints = 100;
+  const size_t kNumTrainingPoints = 100;  // increasing number of training points drastically reduces RMSE
   const size_t kNumTestPoints = 100;
   const double kMaxRmsError = 0.1;
   const double kNoiseVariance = 1e-3;
@@ -42,19 +42,27 @@ TEST(GaussianProcess, TestFunctionApprox2D) {
   const size_t kGradUpdates = 10000;
   //const size_t kRelearnInterval = 2000;
   const double kStepSize = 1.0;
+	double x;
+	double y;
 
   // Random number generator.
   std::random_device rd;
   std::default_random_engine rng(rd());
-  std::uniform_real_distribution<double> unif(0.0, 1.0);
+  std::uniform_real_distribution<double> inputDist(0.0, 5.0);
 
   // Get training points/targets.
   PointSet points(new std::vector<VectorXd>);
   VectorXd targets(kNumTrainingPoints);
-	
-	for (size_t ii = 0; ii < kNumTrainingPoints; ii++) {
-    points->push_back(VectorXd::Constant(2, unif(rng)));
-    targets(ii) = unif(rng);
+
+	VectorXd coords(2);
+	for (size_t ii = 0; ii < kNumTrainingPoints; ii++) {	
+		// Sample input coordinates for training points	
+		x = inputDist(rng);
+		y = inputDist(rng);		
+		coords << x , y;
+    points->push_back(coords);
+		// training targets = function value at sampled points    
+		targets(ii) = Surf(x,y);
   }	
 
 	// Train a GP.
@@ -76,11 +84,10 @@ TEST(GaussianProcess, TestFunctionApprox2D) {
     batch_targets.clear();
 
     for (size_t jj = 0; jj < kBatchSize; jj++) {
-      const double x = unif(rng);
-			const double y = unif(rng);
+      x = inputDist(rng);
+			y = inputDist(rng);
 			VectorXd batch_point(2);
-			point.push_back(x);
-			point.push_back(y);
+			batch_point << x,y;
       batch_points.push_back(batch_point);
       batch_targets.push_back(Surf(x,y));
     }
@@ -96,16 +103,16 @@ TEST(GaussianProcess, TestFunctionApprox2D) {
 	// Test that we have approximated the function well.
   double squared_error = 0.0;
   double mean, variance;
+	VectorXd test_point(2);
   for (size_t ii = 0; ii < kNumTestPoints; ii++) {
-    const double x = unif(rng);
-		const double y = unif(rng);
-    VectorXd test_point(2);
-		test_point.push_back(x);
-		test_point.push_back(y);
+    x = inputDist(rng);
+		y = inputDist(rng);
+		test_point << x,y;
     gp.Evaluate(test_point, mean, variance);
     squared_error += (mean - Surf(x,y)) * (mean - Surf(x,y));
   }
 
+  std::printf("		RMSE 2d: %lf\n", std::sqrt(squared_error / static_cast<double>(kNumTestPoints)));
   EXPECT_LE(std::sqrt(squared_error / static_cast<double>(kNumTestPoints)),
             kMaxRmsError);
 

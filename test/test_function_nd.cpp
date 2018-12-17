@@ -13,6 +13,7 @@
 #include <random>
 #include <vector>
 #include <math.h>
+#include <iostream>
 
 
 #ifdef SYSTEM_OSX
@@ -32,17 +33,19 @@ namespace test {
 
 // How well can we approximate data in higher-dimentions
 TEST(GaussianProcess, TestFunctionApproxND) {
-	const int dim = 5
+	const int dim = 8;
   const size_t kNumTrainingPoints = 100;
   const size_t kNumTestPoints = 100;
   const double kMaxRmsError = 0.1;
   const double kNoiseVariance = 1e-3;
   const double kLength = 1.0;
 
-  const size_t kBatchSize = 16;
+  const size_t kBatchSize = 64;
   const size_t kGradUpdates = 10000;
   //const size_t kRelearnInterval = 2000;
   const double kStepSize = 1.0;
+
+	double x;
 
   // Random number generator.
   std::random_device rd;
@@ -52,10 +55,16 @@ TEST(GaussianProcess, TestFunctionApproxND) {
   // Get training points/targets.
   PointSet points(new std::vector<VectorXd>);
   VectorXd targets(kNumTrainingPoints);
-	
+	std::vector<double> coordVector;
+	VectorXd coords(dim);
 	for (size_t ii = 0; ii < kNumTrainingPoints; ii++) {
-    points->push_back(VectorXd::Constant(dim, unif(rng)));
-    targets(ii) = unif(rng);
+    for (int i = 0; i<dim; i++) {
+			x = unif(rng);
+			coords(i) = x;
+			coordVector.push_back(x);
+		}
+    points->push_back(coords);
+    targets(ii) = P02(coordVector);
   }	
 
 	// Train a GP.
@@ -76,15 +85,17 @@ TEST(GaussianProcess, TestFunctionApproxND) {
     batch_points.clear();
     batch_targets.clear();
 
+		VectorXd batch_point(dim);
+		std::vector<double> batch_coords;
     for (size_t jj = 0; jj < kBatchSize; jj++) {
-      batch_coords = new std::vector<double>; // n dimentional coordinate vector
-			for (size_t i = 0; i < dim; i++) {
-				batch_coords.push_back(unif(rng)); // random point in R^n st each coord is on [0,1]
+			batch_coords.clear();
+			for (int i = 0; i<dim; i++) {
+				x = unif(rng);
+				batch_coords.push_back(x);
+				batch_point(i) = x;
 			}
-			VectorXd batch_point(dim);
-			batch_point << _batch_coords
-      batch_points.push_back(batch_point);
-      batch_targets.push_back(highDFunction(batch_coords));
+      batch_points.push_back(batch_point); // push back a vectorxd representing the coords of a point
+      batch_targets.push_back(P02(batch_coords)); // push back a double - function evaluated at point vector
     }
 
 		// Update parameters.
@@ -98,17 +109,20 @@ TEST(GaussianProcess, TestFunctionApproxND) {
 	// Test that we have approximated the function well.
   double squared_error = 0.0;
   double mean, variance;
+	VectorXd test_point(dim);
+	coordVector.clear();
   for (size_t ii = 0; ii < kNumTestPoints; ii++) {
-    test_coords = new std::vector<double>; // n dimentional coordinate vector
+    //std::vector<double> test_coords; // n dimentional coordinate vector
 			for (size_t i = 0; i < dim; i++) {
-				test_coords.push_back(unif(rng)); // random point in R^n st each coord is on [0,1]
+        x = unif(rng);
+				coordVector.push_back(x); // random point in R^n st each coord is on [0,1]
+				test_point[i] = x;
 			}
-    VectorXd test_point(dim);
-		test_point << test_coords
     gp.Evaluate(test_point, mean, variance);
-    squared_error += (mean - highDFunction(test_coords)) * (mean - highDFunction(test_coords)));
+    squared_error += (mean - P02(coordVector)) * (mean - P02(coordVector));
   }
 
+  std::printf("		RMSE %dd: %lf\n", dim , std::sqrt(squared_error / static_cast<double>(kNumTestPoints)));
   EXPECT_LE(std::sqrt(squared_error / static_cast<double>(kNumTestPoints)),
             kMaxRmsError);
 
